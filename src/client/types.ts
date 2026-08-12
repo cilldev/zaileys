@@ -89,6 +89,16 @@ export interface ClientOptions {
   sticker?: StickerMetadataType
 }
 
+export interface GroupStatusContent {
+  text?: string
+  image?: Buffer | { url: string }
+  video?: Buffer | { url: string }
+  audio?: Buffer | { url: string }
+  caption?: string
+  mimetype?: string
+  backgroundColor?: number
+}
+
 export type ConnectionEventMap = {
   connect: { sessionId: string; me: { id: string; lid?: string; name?: string } }
   disconnect: { sessionId: string; reason: DisconnectReasonDomain; willReconnect: boolean }

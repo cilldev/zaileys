@@ -1,11 +1,14 @@
 import makeWASocket, {
   fetchLatestBaileysVersion,
+  generateWAMessageContent,
+  generateWAMessageFromContent,
   initAuthCreds,
   type AuthenticationCreds,
   type UserFacingSocketConfig,
   type WAMessage,
   type WAMessageKey,
 } from 'baileys'
+import crypto from 'node:crypto'
 import {
   deleteMessage,
   EditBuilder,
@@ -109,6 +112,7 @@ import type {
   ConnectionAuthType,
   ConnectionEventMap,
   ConnectionState,
+  GroupStatusContent,
   Logger,
   ProviderKind,
   ReconnectOptions,
@@ -720,9 +724,13 @@ export class Client extends TypedEventEmitter<ClientEventMap> {
       prefixes: this.commandPrefixes,
       logger: this.logger,
       onText: (handler) => {
-        const wrapped = (msg: MessageContext): void => handler(msg)
-        this.on('text', wrapped)
-        return () => this.off('text', wrapped)
+        const wrapped = (msg: MessageContext): void => {
+          if (typeof msg.text === 'string' && msg.text.trim().length > 0) {
+            handler(msg)
+          }
+        }
+        this.on('message', wrapped)
+        return () => this.off('message', wrapped)
       },
       buildContext: (resolved, msg) => this.buildCommandContext(resolved, msg),
     })
@@ -859,6 +867,39 @@ export class Client extends TypedEventEmitter<ClientEventMap> {
     await socket.sendMessage(recipient, { disappearingMessagesInChat: seconds } as never)
   }
 
+  async sendGroupStatus(targetJid: string, content: GroupStatusContent): Promise<WAMessage> {
+    this.assertWebProvider('sendGroupStatus')
+    const socket = this.requireSocket() as any
+    const backgroundColor = content.backgroundColor
+    const cleanContent: Record<string, unknown> = { ...content }
+    delete cleanContent['backgroundColor']
+
+    const opts: any = {}
+    if (typeof socket.waUploadToServer === 'function') {
+      opts.upload = socket.waUploadToServer.bind(socket)
+    }
+    if (backgroundColor != null) {
+      opts.backgroundColor = backgroundColor
+    }
+
+    const inside = await generateWAMessageContent(cleanContent as any, opts)
+
+    const messageSecret = crypto.randomBytes(32)
+
+    const msg = generateWAMessageFromContent(
+      targetJid,
+      {
+        messageContextInfo: { messageSecret },
+        groupStatusMessageV2: {
+          message: Object.assign({}, inside, { messageContextInfo: { messageSecret } }),
+        },
+      },
+      { userJid: socket.user?.id || targetJid }
+    )
+
+    await socket.relayMessage(targetJid, msg.message, { messageId: msg.key.id })
+    return msg
+  }
   private resolveRecipient(to: string): Promise<string> {
     return resolveUsername(this.requireSocket() as unknown as UsernameResolveSocketLike, to, this.usernameCache)
   }

@@ -62,6 +62,7 @@ export interface MockSocket {
   communityRevokeInvite: Mock
   communityAcceptInvite: Mock
   query: Mock
+  relayMessage: Mock
   triggerConnectionUpdate(update: Record<string, unknown>): void
   triggerCredsUpdate(creds: unknown): void
   setUser(user: MockSocketUser): void
@@ -168,6 +169,9 @@ export function createMockSocket(initial?: { user?: MockSocketUser }): MockSocke
     communityRevokeInvite: vi.fn(async (_jid: string) => 'MOCKINVITECODE'),
     communityAcceptInvite: vi.fn(async (_code: string) => '123@g.us'),
     query: vi.fn(async (_node: unknown) => ({ tag: 'iq', attrs: {}, content: [] })),
+    relayMessage: vi.fn(async (_jid: string, _message: unknown, _options?: unknown) => ({
+      key: { remoteJid: _jid, id: 'mock-relay-id', fromMe: true },
+    })),
     triggerConnectionUpdate(update) {
       ev.emit('connection.update', update)
     },

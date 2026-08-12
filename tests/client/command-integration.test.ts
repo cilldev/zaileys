@@ -293,4 +293,38 @@ describe('Client command framework — ctx helpers', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(threw).toBe(true)
   })
+
+  it('dispatches command on media message with caption', async () => {
+    const { client, sock } = await connected({ commandPrefix: '.' })
+    const handler = vi.fn()
+    client.command('gstatus', handler)
+    sock.ev.emit('messages.upsert', {
+      type: 'notify',
+      messages: [{
+        key: { remoteJid: SENDER, fromMe: false, id: 'CAP1' },
+        messageTimestamp: 1700000000,
+        pushName: 'Alice',
+        message: { imageMessage: { caption: '.gstatus hello', mimetype: 'image/jpeg' } },
+      }],
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(handler).toHaveBeenCalled()
+  })
+
+  it('ignores non-text messages like stickers and reactions for command dispatching', async () => {
+    const { client, sock } = await connected({ commandPrefix: '.' })
+    const handler = vi.fn()
+    client.command('ping', handler)
+    sock.ev.emit('messages.upsert', {
+      type: 'notify',
+      messages: [{
+        key: { remoteJid: SENDER, fromMe: false, id: 'STK1' },
+        messageTimestamp: 1700000000,
+        pushName: 'Alice',
+        message: { stickerMessage: { mimetype: 'image/webp' } },
+      }],
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(handler).not.toHaveBeenCalled()
+  })
 })
